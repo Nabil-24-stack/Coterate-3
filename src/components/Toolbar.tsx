@@ -31,7 +31,7 @@ const Toolbar: React.FC = () => {
     <ToolbarContainer>
       <Logo>
         <LogoImage>
-          <Image src="/logo.png" alt="Coterate Logo" width={32} height={32} />
+          <Image src="/Coterate logo.png" alt="Coterate Logo" width={32} height={32} />
         </LogoImage>
         Coterate
       </Logo>
