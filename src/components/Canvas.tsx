@@ -41,12 +41,13 @@ const DesignItem = styled.div<{ $position: Position; $isSelected: boolean }>`
   left: ${props => props.$position.x}px;
   top: ${props => props.$position.y}px;
   user-select: none;
-  border: ${props => props.$isSelected ? '2px solid #1890ff' : '2px solid transparent'};
+  border: ${props => props.$isSelected ? '3px solid #007bff' : '2px solid transparent'};
+  box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : 'none'};
   transform: translate(-50%, -50%);
   z-index: 10;
   
   &:hover {
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+    box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : '0 0 0 1px rgba(0, 0, 0, 0.1)'};
   }
 `;
 
