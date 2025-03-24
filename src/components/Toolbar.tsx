@@ -1,5 +1,6 @@
 import React from 'react';
 import styled from 'styled-components';
+import Image from 'next/image';
 
 const ToolbarContainer = styled.div`
   height: 68px;
@@ -19,20 +20,23 @@ const Logo = styled.div`
   font-family: 'Plus Jakarta Sans', sans-serif;
 `;
 
-const LogoIcon = styled.span`
-  color: #4169e1;
+const LogoImage = styled.div`
   margin-right: 8px;
+  display: flex;
+  align-items: center;
 `;
 
 const Toolbar: React.FC = () => {
   return (
     <ToolbarContainer>
       <Logo>
-        <LogoIcon>🚀</LogoIcon>
+        <LogoImage>
+          <Image src="/logo.png" alt="Coterate Logo" width={32} height={32} />
+        </LogoImage>
         Coterate
       </Logo>
     </ToolbarContainer>
   );
 };
 
-export default Toolbar; 
+export default Toolbar;
