@@ -5,6 +5,15 @@ const nextConfig = {
     styledComponents: true,
   },
   devIndicators: false,
+  images: {
+    dangerouslyAllowSVG: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
+  },
 }
 
-module.exports = nextConfig 
+module.exports = nextConfig
