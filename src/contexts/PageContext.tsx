@@ -10,9 +10,13 @@ interface PageContextType {
   deletePage: (pageId: string) => void;
 }
 
+const currentTimestamp = new Date().toISOString();
+
 const defaultPage: Page = {
   id: 'page-1',
-  name: 'Page 1'
+  name: 'Page 1',
+  createdAt: currentTimestamp,
+  updatedAt: currentTimestamp
 };
 
 const defaultValue: PageContextType = {
@@ -31,9 +35,12 @@ export const PageProvider = ({ children }: { children: ReactNode }) => {
   const [currentPage, setCurrentPageState] = useState<Page>(defaultPage);
 
   const addPage = (name: string) => {
+    const timestamp = new Date().toISOString();
     const newPage: Page = {
       id: `page-${Date.now()}`,
-      name
+      name,
+      createdAt: timestamp,
+      updatedAt: timestamp
     };
     // Add the new page to the bottom of the list
     setPages([...pages, newPage]);
@@ -48,14 +55,17 @@ export const PageProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const renamePage = (pageId: string, newName: string) => {
+    const timestamp = new Date().toISOString();
     const updatedPages = pages.map(page => 
-      page.id === pageId ? { ...page, name: newName } : page
+      page.id === pageId 
+        ? { ...page, name: newName, updatedAt: timestamp } 
+        : page
     );
     setPages(updatedPages);
     
     // Update current page if it was renamed
     if (currentPage.id === pageId) {
-      setCurrentPageState({ ...currentPage, name: newName });
+      setCurrentPageState({ ...currentPage, name: newName, updatedAt: timestamp });
     }
   };
 
@@ -86,4 +96,4 @@ export const PageProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-export const usePageContext = () => useContext(PageContext); 
+export const usePageContext = () => useContext(PageContext);
