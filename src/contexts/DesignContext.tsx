@@ -11,6 +11,7 @@ interface DesignContextType {
   designs: DesignIteration[];
   addDesign: (design: Omit<DesignIteration, 'id' | 'timestamp'>) => void;
   removeDesign: (id: string) => void;
+  updateDesignPosition: (id: string, position: Position) => void;
   getDesignsForCurrentPage: () => DesignIteration[];
 }
 
@@ -46,6 +47,16 @@ export function DesignProvider({ children }: DesignProviderProps) {
     setDesigns(prev => prev.filter(design => design.id !== id));
   };
   
+  const updateDesignPosition = (id: string, position: Position) => {
+    setDesigns(prev => 
+      prev.map(design => 
+        design.id === id 
+          ? { ...design, position } 
+          : design
+      )
+    );
+  };
+  
   const getDesignsForCurrentPage = () => {
     return designs.filter(design => design.pageId === currentPage.id);
   };
@@ -54,6 +65,7 @@ export function DesignProvider({ children }: DesignProviderProps) {
     designs,
     addDesign,
     removeDesign,
+    updateDesignPosition,
     getDesignsForCurrentPage,
   };
 
@@ -62,4 +74,4 @@ export function DesignProvider({ children }: DesignProviderProps) {
       {children}
     </DesignContext.Provider>
   );
-} 
+}
