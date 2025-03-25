@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  swcMinify: true,
-  // Remove experimental.appDir as it's now deprecated in Next.js 14+
+  compiler: {
+    styledComponents: true,
+  },
+  devIndicators: {
+    buildActivity: false
+  },
   images: {
     dangerouslyAllowSVG: true,
     remotePatterns: [
@@ -12,18 +16,6 @@ const nextConfig = {
       },
     ],
   },
-  compiler: {
-    styledComponents: true,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
-  typescript: {
-    ignoreBuildErrors: true,
-  },
-  devIndicators: {
-    buildActivity: false
-  }
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig
