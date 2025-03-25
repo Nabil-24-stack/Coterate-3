@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { usePageContext } from '@/contexts/PageContext';
 import { useDesignContext } from '@/contexts/DesignContext';
-import { Position, DesignIteration } from '@/types';
+import { Position, DesignIteration, AIAnalysis } from '@/types';
+import { analyzeUIImage } from '@/services/openai';
+import UIAnalysisResults from './UIAnalysisResult';
 
 const CanvasContainer = styled.div`
   flex: 1;
@@ -122,6 +124,43 @@ const PlusButton = styled.div`
   }
 `;
 
+// Loading indicator for analysis in progress
+const LoadingSpinner = styled.div<{ $scale: number }>`
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(0, 123, 255, 0.2);
+  border-top: 3px solid #007bff;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 1s linear infinite;
+  transform: scale(${props => 1 / props.$scale});
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg) scale(${props => 1 / props.$scale}); }
+    100% { transform: rotate(360deg) scale(${props => 1 / props.$scale}); }
+  }
+`;
+
+const LoadingContainer = styled.div<{ $position: Position }>`
+  position: absolute;
+  left: ${props => props.$position.x}px;
+  top: ${props => props.$position.y}px;
+  transform: translate(-50%, -50%);
+  z-index: 30;
+  padding: 15px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+`;
+
+const LoadingText = styled.div<{ $scale: number }>`
+  margin-top: 10px;
+  font-size: ${props => 14 / props.$scale}px;
+  color: #555;
+  transform: scale(${props => 1 / props.$scale});
+`;
+
 const Canvas: React.FC = () => {
   const { currentPage } = usePageContext();
   const { designs, addDesign, removeDesign, updateDesignPosition, getDesignsForCurrentPage } = useDesignContext();
@@ -136,6 +175,12 @@ const Canvas: React.FC = () => {
   const [isDraggingDesign, setIsDraggingDesign] = useState<boolean>(false);
   const [designDragStart, setDesignDragStart] = useState<Position>({ x: 0, y: 0 });
   const [designInitialPosition, setDesignInitialPosition] = useState<Position | null>(null);
+  
+  // State for AI analysis
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [activeAnalysisDesign, setActiveAnalysisDesign] = useState<string | null>(null);
+  const [analysisResults, setAnalysisResults] = useState<{ [designId: string]: AIAnalysis }>({});
+  const [showAnalysisResults, setShowAnalysisResults] = useState<boolean>(false);
   
   const canvasRef = useRef<HTMLDivElement>(null);
   
@@ -221,6 +266,7 @@ const Canvas: React.FC = () => {
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
       setSelectedDesign(null); // Deselect when clicking on canvas
+      setShowAnalysisResults(false); // Hide analysis results when clicking on canvas
     }
   };
   
@@ -275,6 +321,12 @@ const Canvas: React.FC = () => {
   const handleDesignClick = (designId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedDesign(designId);
+    
+    // Hide analysis results when selecting a new design
+    if (activeAnalysisDesign !== designId) {
+      setShowAnalysisResults(false);
+    }
+    setActiveAnalysisDesign(designId);
   };
   
   const handleDesignMouseDown = (design: DesignIteration, e: React.MouseEvent) => {
@@ -288,10 +340,47 @@ const Canvas: React.FC = () => {
     }
   };
   
-  const handlePlusClick = (e: React.MouseEvent) => {
+  const handlePlusClick = async (designId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // This will be implemented later - for now just prevent the click from deselecting
-    console.log('Plus button clicked');
+    
+    const design = designs.find(d => d.id === designId);
+    if (!design) return;
+    
+    // Set the current design as the active one for analysis
+    setActiveAnalysisDesign(designId);
+    
+    // Show loading state
+    setIsAnalyzing(true);
+    setShowAnalysisResults(false);
+    
+    try {
+      // Call the OpenAI API to analyze the UI image
+      const result = await analyzeUIImage(design.imageUrl);
+      
+      // Add timestamp to the analysis
+      const analysisWithTimestamp: AIAnalysis = {
+        ...result,
+        timestamp: new Date().toISOString()
+      };
+      
+      // Store the analysis results
+      setAnalysisResults(prev => ({
+        ...prev,
+        [designId]: analysisWithTimestamp
+      }));
+      
+      // Show the analysis results
+      setShowAnalysisResults(true);
+    } catch (error) {
+      console.error('Failed to analyze UI:', error);
+      alert('Failed to analyze UI. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+  
+  const handleCloseAnalysis = () => {
+    setShowAnalysisResults(false);
   };
   
   const handlePaste = (e: ClipboardEvent) => {
@@ -404,6 +493,7 @@ const Canvas: React.FC = () => {
         // Delete selected design when Delete or Backspace key is pressed
         removeDesign(selectedDesign);
         setSelectedDesign(null);
+        setShowAnalysisResults(false);
       }
     };
     
@@ -414,7 +504,7 @@ const Canvas: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
     };
-  }, [addDesign, removeDesign, currentPage.id, scale, canvasPosition, selectedDesign]);
+  }, [addDesign, removeDesign, currentPage.id, scale, canvasPosition, selectedDesign, activeAnalysisDesign]);
   
   const currentDesigns = getDesignsForCurrentPage();
   
@@ -429,6 +519,9 @@ const Canvas: React.FC = () => {
       setDesignInitialPosition(null);
     }
   };
+  
+  // Get the selected design
+  const selectedDesignObject = currentDesigns.find(design => design.id === selectedDesign);
   
   return (
     <CanvasContainer
@@ -455,13 +548,33 @@ const Canvas: React.FC = () => {
               {selectedDesign === design.id && (
                 <PlusButtonContainer $dimensions={design.dimensions}>
                   <PlusButtonWrapper $scale={scale}>
-                    <PlusButton onClick={handlePlusClick} />
+                    <PlusButton onClick={(e) => handlePlusClick(design.id, e)} />
                   </PlusButtonWrapper>
                 </PlusButtonContainer>
               )}
             </DesignImageWrapper>
           </DesignItem>
         ))}
+        
+        {/* Loading spinner while analyzing */}
+        {isAnalyzing && activeAnalysisDesign && (
+          <LoadingContainer 
+            $position={designs.find(d => d.id === activeAnalysisDesign)?.position || { x: 0, y: 0 }}
+          >
+            <LoadingSpinner $scale={scale} />
+            <LoadingText $scale={scale}>Analyzing UI...</LoadingText>
+          </LoadingContainer>
+        )}
+        
+        {/* Analysis results */}
+        {showAnalysisResults && activeAnalysisDesign && analysisResults[activeAnalysisDesign] && selectedDesignObject && (
+          <UIAnalysisResults 
+            result={analysisResults[activeAnalysisDesign]}
+            position={selectedDesignObject.position}
+            scale={scale}
+            onClose={handleCloseAnalysis}
+          />
+        )}
       </CanvasContent>
     </CanvasContainer>
   );
