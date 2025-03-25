@@ -14,39 +14,6 @@ export interface Feedback {
   timestamp: string;
 }
 
-export interface UIElement {
-  type: string;
-  position: Position;
-  dimensions: Dimension;
-  text?: string;
-  properties: Record<string, any>;
-}
-
-export interface LayoutGroup {
-  type: string;
-  elements: string[];
-  groups?: LayoutGroup[];
-}
-
-export interface UIAnalysisResult {
-  elements: UIElement[];
-  layout: {
-    type: string;
-    groups: LayoutGroup[];
-  };
-  description: string;
-}
-
-export interface AIAnalysis {
-  elements: UIElement[];
-  layout: {
-    type: string;
-    groups: any[];
-  };
-  description: string;
-  timestamp: string;
-}
-
 export interface DesignIteration {
   id: string;
   name: string;
@@ -56,7 +23,6 @@ export interface DesignIteration {
   dimensions?: Dimension;
   feedback: Feedback | null;
   timestamp: string;
-  aiAnalysis?: AIAnalysis;
 }
 
 export interface Page {
