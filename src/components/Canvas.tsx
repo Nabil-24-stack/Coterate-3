@@ -36,7 +36,7 @@ const CanvasContent = styled.div<{ $scale: number; $position: Position }>`
   z-index: 1;
 `;
 
-const DesignItem = styled.div<{ $position: Position; $isSelected: boolean; $isDragging?: boolean }>`
+const DesignItem = styled.div<{ $position: Position; $isSelected: boolean }>`
   position: absolute;
   left: ${props => props.$position.x}px;
   top: ${props => props.$position.y}px;
@@ -44,8 +44,7 @@ const DesignItem = styled.div<{ $position: Position; $isSelected: boolean; $isDr
   border: ${props => props.$isSelected ? '3px solid #007bff' : '2px solid transparent'};
   box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : 'none'};
   transform: translate(-50%, -50%);
-  z-index: ${props => (props.$isSelected || props.$isDragging) ? 20 : 10};
-  cursor: ${props => (props.$isSelected) ? 'move' : 'pointer'};
+  z-index: 10;
   
   &:hover {
     box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : '0 0 0 1px rgba(0, 0, 0, 0.1)'};
@@ -124,18 +123,13 @@ const PlusButton = styled.div`
 
 const Canvas: React.FC = () => {
   const { currentPage } = usePageContext();
-  const { designs, addDesign, removeDesign, updateDesignPosition, getDesignsForCurrentPage } = useDesignContext();
+  const { designs, addDesign, removeDesign, getDesignsForCurrentPage } = useDesignContext();
   
   const [scale, setScale] = useState<number>(1);
   const [canvasPosition, setCanvasPosition] = useState<Position>({ x: 0, y: 0 });
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
-  
-  // States for design dragging
-  const [isDraggingDesign, setIsDraggingDesign] = useState<boolean>(false);
-  const [designDragStart, setDesignDragStart] = useState<Position>({ x: 0, y: 0 });
-  const [designInitialPosition, setDesignInitialPosition] = useState<Position | null>(null);
   
   const canvasRef = useRef<HTMLDivElement>(null);
   
@@ -220,39 +214,10 @@ const Canvas: React.FC = () => {
       
       setDragStart({ x: e.clientX, y: e.clientY });
     }
-    
-    // Handle design dragging
-    if (isDraggingDesign && selectedDesign && designInitialPosition) {
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Calculate the delta in screen coordinates
-      const deltaX = e.clientX - designDragStart.x;
-      const deltaY = e.clientY - designDragStart.y;
-      
-      // Convert the delta to canvas coordinates
-      const deltaCanvasX = deltaX / scale;
-      const deltaCanvasY = deltaY / scale;
-      
-      // Calculate new position
-      const newPosition = {
-        x: designInitialPosition.x + deltaCanvasX,
-        y: designInitialPosition.y + deltaCanvasY
-      };
-      
-      // Update the design position
-      updateDesignPosition(selectedDesign, newPosition);
-    }
   };
   
   const handleMouseUp = () => {
     setIsDragging(false);
-    
-    // End design dragging if it was in progress
-    if (isDraggingDesign) {
-      setIsDraggingDesign(false);
-      setDesignInitialPosition(null);
-    }
   };
   
   const handleDesignClick = (designId: string, e: React.MouseEvent) => {
@@ -260,20 +225,10 @@ const Canvas: React.FC = () => {
     setSelectedDesign(designId);
   };
   
-  const handleDesignMouseDown = (design: DesignIteration, e: React.MouseEvent) => {
-    if (selectedDesign === design.id) {
-      e.stopPropagation();
-      
-      // Start dragging the design
-      setIsDraggingDesign(true);
-      setDesignDragStart({ x: e.clientX, y: e.clientY });
-      setDesignInitialPosition({ ...design.position });
-    }
-  };
-  
-  const handlePlusClick = (designId: string, e: React.MouseEvent) => {
+  const handlePlusClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    alert('Add new iteration functionality will be added in a future update.');
+    // This will be implemented later - for now just prevent the click from deselecting
+    console.log('Plus button clicked');
   };
   
   const handlePaste = (e: ClipboardEvent) => {
@@ -296,6 +251,9 @@ const Canvas: React.FC = () => {
               width: img.naturalWidth,
               height: img.naturalHeight
             };
+            
+            console.log('Pasting image at position:', viewportCenter);
+            console.log('Image dimensions:', dimensions.width, 'x', dimensions.height);
             
             const mockDesign: Omit<DesignIteration, 'id' | 'timestamp'> = {
               name: 'Pasted Design',
@@ -325,17 +283,21 @@ const Canvas: React.FC = () => {
         setCanvasPosition({ x: 0, y: 0 });
       } else if ((e.key === '+' || e.key === '=') && e.ctrlKey) {
         e.preventDefault();
+        // Increase zoom by 10% at a time
         const zoomFactor = 1.1;
         const newScale = scale * zoomFactor;
         
+        // Zoom toward the center of the viewport
         if (canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect();
           const centerX = rect.width / 2;
           const centerY = rect.height / 2;
           
+          // Calculate the center position in canvas space
           const centerCanvasX = (centerX - canvasPosition.x) / scale;
           const centerCanvasY = (centerY - canvasPosition.y) / scale;
           
+          // Calculate new position to zoom toward center
           const newPosX = centerX - centerCanvasX * newScale;
           const newPosY = centerY - centerCanvasY * newScale;
           
@@ -349,17 +311,21 @@ const Canvas: React.FC = () => {
         }
       } else if (e.key === '-' && e.ctrlKey) {
         e.preventDefault();
+        // Decrease zoom by 10% at a time
         const zoomFactor = 1.1;
         const newScale = scale / zoomFactor;
         
+        // Zoom toward the center of the viewport
         if (canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect();
           const centerX = rect.width / 2;
           const centerY = rect.height / 2;
           
+          // Calculate the center position in canvas space
           const centerCanvasX = (centerX - canvasPosition.x) / scale;
           const centerCanvasY = (centerY - canvasPosition.y) / scale;
           
+          // Calculate new position to zoom toward center
           const newPosX = centerX - centerCanvasX * newScale;
           const newPosY = centerY - centerCanvasY * newScale;
           
@@ -389,13 +355,12 @@ const Canvas: React.FC = () => {
   
   const currentDesigns = getDesignsForCurrentPage();
   
+  // Format scale for display (as percentage)
+  const displayScale = Math.round(scale * 100);
+  
   // Add an additional handler for mouse leave to prevent stuck drags
   const handleMouseLeave = () => {
     setIsDragging(false);
-    if (isDraggingDesign) {
-      setIsDraggingDesign(false);
-      setDesignInitialPosition(null);
-    }
   };
   
   return (
@@ -414,16 +379,14 @@ const Canvas: React.FC = () => {
             key={design.id}
             $position={design.position}
             $isSelected={selectedDesign === design.id}
-            $isDragging={isDraggingDesign && selectedDesign === design.id}
             onClick={(e) => handleDesignClick(design.id, e)}
-            onMouseDown={(e) => handleDesignMouseDown(design, e)}
           >
             <DesignImageWrapper $dimensions={design.dimensions}>
               <DesignImage src={design.imageUrl} alt={design.name} />
               {selectedDesign === design.id && (
                 <PlusButtonContainer $dimensions={design.dimensions}>
                   <PlusButtonWrapper $scale={scale}>
-                    <PlusButton onClick={(e) => handlePlusClick(design.id, e)} />
+                    <PlusButton onClick={handlePlusClick} />
                   </PlusButtonWrapper>
                 </PlusButtonContainer>
               )}
