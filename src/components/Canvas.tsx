@@ -69,7 +69,7 @@ const DesignImage = styled.img`
 
 const PlusButtonContainer = styled.div<{ $dimensions?: { width: number; height: number } }>`
   position: absolute;
-  right: ${props => props.$dimensions ? `-${props.$dimensions.width / 2 + 20}px` : '-48px'};
+  right: ${props => props.$dimensions ? `-${props.$dimensions.width / 2 + 5}px` : '-20px'};
   top: 50%;
   transform: translateY(-50%);
   z-index: 99;
@@ -78,7 +78,7 @@ const PlusButtonContainer = styled.div<{ $dimensions?: { width: number; height: 
 // Create a fixed-size container that will handle the scaling
 const PlusButtonWrapper = styled.div<{ $scale: number }>`
   transform: scale(${props => 1 / props.$scale});
-  transform-origin: center center;
+  transform-origin: left center;
 `;
 
 // The plus button itself with fixed size
