@@ -15,13 +15,15 @@ export interface Feedback {
 }
 
 export interface AIAnalysisElement {
-  title: string;
-  description: string;
-  score?: number;
-  confidence?: number;
+  type: string;
+  text?: string;
+  position: Position;
+  dimensions: Dimension;
+  properties: Record<string, any>;
 }
 
 export interface AIAnalysis {
+  description: string;
   elements: AIAnalysisElement[];
   overallScore?: number;
   timestamp: string;
