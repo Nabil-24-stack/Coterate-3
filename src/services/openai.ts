@@ -1,29 +1,7 @@
 /**
  * OpenAI API service for analyzing UI images
  */
-
-type UIElement = {
-  type: string;
-  position: { x: number; y: number };
-  dimensions: { width: number; height: number };
-  text?: string;
-  properties: Record<string, any>;
-};
-
-type LayoutGroup = {
-  type: string;
-  elements: string[];
-  groups?: LayoutGroup[];
-};
-
-type UIAnalysisResult = {
-  elements: UIElement[];
-  layout: {
-    type: string;
-    groups: LayoutGroup[];
-  };
-  description: string;
-};
+import { UIElement, UIAnalysisResult } from '@/types';
 
 /**
  * Analyzes a UI image using OpenAI's GPT-4o Vision model
