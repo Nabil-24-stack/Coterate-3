@@ -1,54 +1,52 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { DesignIteration, Position } from '@/types';
+import { v4 as uuidv4 } from 'uuid';
+import { DesignIteration, AIAnalysis } from '@/types';
 import { usePageContext } from './PageContext';
-
-// Generate a random ID (since uuid is not available)
-function generateId() {
-  return `design-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-}
 
 interface DesignContextType {
   designs: DesignIteration[];
-  addDesign: (design: Omit<DesignIteration, 'id' | 'timestamp'>) => void;
+  addDesign: (design: Omit<DesignIteration, 'id' | 'timestamp'>) => string;
   removeDesign: (id: string) => void;
-  updateDesignPosition: (id: string, position: Position) => void;
+  updateDesignPosition: (id: string, position: { x: number; y: number }) => void;
+  updateDesignAIAnalysis: (id: string, analysis: AIAnalysis) => void;
   getDesignsForCurrentPage: () => DesignIteration[];
-  getDesignById: (id: string) => DesignIteration | undefined;
 }
 
 const DesignContext = createContext<DesignContextType | undefined>(undefined);
 
-export function useDesignContext() {
+export const useDesignContext = () => {
   const context = useContext(DesignContext);
   if (!context) {
     throw new Error('useDesignContext must be used within a DesignProvider');
   }
   return context;
-}
+};
 
 interface DesignProviderProps {
   children: ReactNode;
 }
 
-export function DesignProvider({ children }: DesignProviderProps) {
+export const DesignProvider: React.FC<DesignProviderProps> = ({ children }) => {
   const [designs, setDesigns] = useState<DesignIteration[]>([]);
   const { currentPage } = usePageContext();
 
   const addDesign = (design: Omit<DesignIteration, 'id' | 'timestamp'>) => {
+    const newId = uuidv4();
     const newDesign: DesignIteration = {
       ...design,
-      id: generateId(),
+      id: newId,
       timestamp: new Date().toISOString(),
     };
     
     setDesigns(prev => [...prev, newDesign]);
+    return newId;
   };
   
   const removeDesign = (id: string) => {
     setDesigns(prev => prev.filter(design => design.id !== id));
   };
   
-  const updateDesignPosition = (id: string, position: Position) => {
+  const updateDesignPosition = (id: string, position: { x: number; y: number }) => {
     setDesigns(prev => 
       prev.map(design => 
         design.id === id 
@@ -58,26 +56,30 @@ export function DesignProvider({ children }: DesignProviderProps) {
     );
   };
   
+  const updateDesignAIAnalysis = (id: string, analysis: AIAnalysis) => {
+    setDesigns(prev => 
+      prev.map(design => 
+        design.id === id 
+          ? { ...design, analysis } 
+          : design
+      )
+    );
+  };
+  
   const getDesignsForCurrentPage = () => {
     return designs.filter(design => design.pageId === currentPage.id);
   };
   
-  const getDesignById = (id: string) => {
-    return designs.find(design => design.id === id);
-  };
-
-  const value = {
-    designs,
-    addDesign,
-    removeDesign,
-    updateDesignPosition,
-    getDesignsForCurrentPage,
-    getDesignById
-  };
-
   return (
-    <DesignContext.Provider value={value}>
+    <DesignContext.Provider value={{ 
+      designs, 
+      addDesign, 
+      removeDesign, 
+      updateDesignPosition,
+      updateDesignAIAnalysis,
+      getDesignsForCurrentPage 
+    }}>
       {children}
     </DesignContext.Provider>
   );
-}
+};
