@@ -57,6 +57,7 @@ const DesignImageWrapper = styled.div<{ $dimensions?: { width: number; height: n
   justify-content: center;
   width: ${props => props.$dimensions ? `${props.$dimensions.width}px` : 'auto'};
   height: ${props => props.$dimensions ? `${props.$dimensions.height}px` : 'auto'};
+  position: relative;
 `;
 
 const DesignImage = styled.img`
@@ -64,6 +65,34 @@ const DesignImage = styled.img`
   max-height: 100%;
   display: block;
   pointer-events: none;
+`;
+
+const PlusButton = styled.button`
+  position: absolute;
+  right: -40px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: #007bff;
+  color: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: #0056b3;
+  }
+  
+  &:focus {
+    outline: none;
+  }
 `;
 
 const Canvas: React.FC = () => {
@@ -168,6 +197,12 @@ const Canvas: React.FC = () => {
   const handleDesignClick = (designId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedDesign(designId);
+  };
+  
+  const handlePlusClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // This will be implemented later - for now just prevent the click from deselecting
+    console.log('Plus button clicked');
   };
   
   const handlePaste = (e: ClipboardEvent) => {
@@ -322,6 +357,9 @@ const Canvas: React.FC = () => {
           >
             <DesignImageWrapper $dimensions={design.dimensions}>
               <DesignImage src={design.imageUrl} alt={design.name} />
+              {selectedDesign === design.id && (
+                <PlusButton onClick={handlePlusClick}>+</PlusButton>
+              )}
             </DesignImageWrapper>
           </DesignItem>
         ))}
@@ -330,4 +368,4 @@ const Canvas: React.FC = () => {
   );
 };
 
-export default Canvas; 
+export default Canvas;
