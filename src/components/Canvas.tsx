@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { usePageContext } from '@/contexts/PageContext';
 import { useDesignContext } from '@/contexts/DesignContext';
-import { Position, DesignIteration, AIAnalysis } from '@/types';
+import { Position, DesignIteration, AIAnalysis, UIAnalysisResult } from '@/types';
 import { analyzeUIImage } from '@/services/openai';
 import UIAnalysisResults from './UIAnalysisResult';
 
@@ -38,7 +38,7 @@ const CanvasContent = styled.div<{ $scale: number; $position: Position }>`
   z-index: 1;
 `;
 
-const DesignItem = styled.div<{ $position: Position; $isSelected: boolean; $isDragging: boolean }>`
+const DesignItem = styled.div<{ $position: Position; $isSelected: boolean; $isDragging?: boolean }>`
   position: absolute;
   left: ${props => props.$position.x}px;
   top: ${props => props.$position.y}px;
@@ -171,15 +171,15 @@ const Canvas: React.FC = () => {
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
   
-  // New state for tracking design dragging
+  // States for design dragging
   const [isDraggingDesign, setIsDraggingDesign] = useState<boolean>(false);
   const [designDragStart, setDesignDragStart] = useState<Position>({ x: 0, y: 0 });
   const [designInitialPosition, setDesignInitialPosition] = useState<Position | null>(null);
   
-  // State for AI analysis
+  // States for AI analysis
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [activeAnalysisDesign, setActiveAnalysisDesign] = useState<string | null>(null);
-  const [analysisResults, setAnalysisResults] = useState<{ [designId: string]: AIAnalysis }>({});
+  const [analysisResults, setAnalysisResults] = useState<{ [designId: string]: UIAnalysisResult }>({});
   const [showAnalysisResults, setShowAnalysisResults] = useState<boolean>(false);
   
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -199,23 +199,6 @@ const Canvas: React.FC = () => {
     const canvasCenterY = (centerY - canvasPosition.y) / scale;
     
     return { x: canvasCenterX, y: canvasCenterY };
-  };
-  
-  // Convert screen coordinates to canvas coordinates
-  const screenToCanvasCoordinates = (screenX: number, screenY: number): Position => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
-    
-    const rect = canvasRef.current.getBoundingClientRect();
-    
-    // Screen position relative to canvas element
-    const relativeX = screenX - rect.left;
-    const relativeY = screenY - rect.top;
-    
-    // Convert to canvas coordinates (accounting for scale and pan)
-    const canvasX = (relativeX - canvasPosition.x) / scale;
-    const canvasY = (relativeY - canvasPosition.y) / scale;
-    
-    return { x: canvasX, y: canvasY };
   };
   
   const handleWheel = (e: React.WheelEvent) => {
@@ -354,19 +337,13 @@ const Canvas: React.FC = () => {
     setShowAnalysisResults(false);
     
     try {
-      // Call the OpenAI API to analyze the UI image
+      // Call the API to analyze the UI image
       const result = await analyzeUIImage(design.imageUrl);
-      
-      // Add timestamp to the analysis
-      const analysisWithTimestamp: AIAnalysis = {
-        ...result,
-        timestamp: new Date().toISOString()
-      };
       
       // Store the analysis results
       setAnalysisResults(prev => ({
         ...prev,
-        [designId]: analysisWithTimestamp
+        [designId]: result
       }));
       
       // Show the analysis results
@@ -404,9 +381,6 @@ const Canvas: React.FC = () => {
               height: img.naturalHeight
             };
             
-            console.log('Pasting image at position:', viewportCenter);
-            console.log('Image dimensions:', dimensions.width, 'x', dimensions.height);
-            
             const mockDesign: Omit<DesignIteration, 'id' | 'timestamp'> = {
               name: 'Pasted Design',
               pageId: currentPage.id,
@@ -435,21 +409,17 @@ const Canvas: React.FC = () => {
         setCanvasPosition({ x: 0, y: 0 });
       } else if ((e.key === '+' || e.key === '=') && e.ctrlKey) {
         e.preventDefault();
-        // Increase zoom by 10% at a time
         const zoomFactor = 1.1;
         const newScale = scale * zoomFactor;
         
-        // Zoom toward the center of the viewport
         if (canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect();
           const centerX = rect.width / 2;
           const centerY = rect.height / 2;
           
-          // Calculate the center position in canvas space
           const centerCanvasX = (centerX - canvasPosition.x) / scale;
           const centerCanvasY = (centerY - canvasPosition.y) / scale;
           
-          // Calculate new position to zoom toward center
           const newPosX = centerX - centerCanvasX * newScale;
           const newPosY = centerY - centerCanvasY * newScale;
           
@@ -463,21 +433,17 @@ const Canvas: React.FC = () => {
         }
       } else if (e.key === '-' && e.ctrlKey) {
         e.preventDefault();
-        // Decrease zoom by 10% at a time
         const zoomFactor = 1.1;
         const newScale = scale / zoomFactor;
         
-        // Zoom toward the center of the viewport
         if (canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect();
           const centerX = rect.width / 2;
           const centerY = rect.height / 2;
           
-          // Calculate the center position in canvas space
           const centerCanvasX = (centerX - canvasPosition.x) / scale;
           const centerCanvasY = (centerY - canvasPosition.y) / scale;
           
-          // Calculate new position to zoom toward center
           const newPosX = centerX - centerCanvasX * newScale;
           const newPosY = centerY - centerCanvasY * newScale;
           
@@ -504,12 +470,9 @@ const Canvas: React.FC = () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('paste', handlePaste);
     };
-  }, [addDesign, removeDesign, currentPage.id, scale, canvasPosition, selectedDesign, activeAnalysisDesign]);
+  }, [addDesign, removeDesign, currentPage.id, scale, canvasPosition, selectedDesign]);
   
   const currentDesigns = getDesignsForCurrentPage();
-  
-  // Format scale for display (as percentage)
-  const displayScale = Math.round(scale * 100);
   
   // Add an additional handler for mouse leave to prevent stuck drags
   const handleMouseLeave = () => {
