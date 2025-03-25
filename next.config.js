@@ -4,7 +4,13 @@ const nextConfig = {
   swcMinify: true,
   // Remove experimental.appDir as it's now deprecated in Next.js 14+
   images: {
-    domains: ['plus.unsplash.com', 'images.unsplash.com'],
+    dangerouslyAllowSVG: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
   },
   compiler: {
     styledComponents: true,
@@ -16,7 +22,7 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   devIndicators: {
-    buildActivity: true
+    buildActivity: false
   }
 };
 
