@@ -67,22 +67,27 @@ const DesignImage = styled.img`
   pointer-events: none;
 `;
 
-const PlusButton = styled.div`
+const PlusButtonContainer = styled.div`
   position: absolute;
   right: -48px;
   top: 50%;
   transform: translateY(-50%);
-  width: 40px;
-  height: 40px;
+  z-index: 20;
+`;
+
+const PlusButton = styled.div<{ $scale: number }>`
+  width: ${props => 40 / props.$scale}px;
+  height: ${props => 40 / props.$scale}px;
   border-radius: 50%;
   background-color: #007bff;
   color: white;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 ${props => 2 / props.$scale}px ${props => 4 / props.$scale}px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
   
   &:hover {
     background-color: #0056b3;
@@ -96,16 +101,16 @@ const PlusButton = styled.div`
   }
   
   &::before {
-    width: 16px;
-    height: 2px;
+    width: ${props => 16 / props.$scale}px;
+    height: ${props => 2 / props.$scale}px;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
   }
   
   &::after {
-    width: 2px;
-    height: 16px;
+    width: ${props => 2 / props.$scale}px;
+    height: ${props => 16 / props.$scale}px;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -375,7 +380,9 @@ const Canvas: React.FC = () => {
             <DesignImageWrapper $dimensions={design.dimensions}>
               <DesignImage src={design.imageUrl} alt={design.name} />
               {selectedDesign === design.id && (
-                <PlusButton onClick={handlePlusClick} />
+                <PlusButtonContainer>
+                  <PlusButton $scale={scale} onClick={handlePlusClick} />
+                </PlusButtonContainer>
               )}
             </DesignImageWrapper>
           </DesignItem>
