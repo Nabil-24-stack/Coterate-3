@@ -25,8 +25,6 @@ export interface AIAnalysisElement {
 export interface AIAnalysis {
   description: string;
   elements: AIAnalysisElement[];
-  overallScore?: number;
-  timestamp: string;
 }
 
 export interface DesignIteration {
