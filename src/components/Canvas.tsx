@@ -69,15 +69,15 @@ const DesignImage = styled.img`
 
 const PlusButton = styled.button`
   position: absolute;
-  right: -40px;
+  right: -48px;
   top: 50%;
   transform: translateY(-50%);
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background-color: #007bff;
   color: white;
-  font-size: 20px;
+  font-size: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -85,6 +85,8 @@ const PlusButton = styled.button`
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s ease;
+  padding: 0;
+  line-height: 1;
   
   &:hover {
     background-color: #0056b3;
@@ -92,6 +94,16 @@ const PlusButton = styled.button`
   
   &:focus {
     outline: none;
+  }
+  
+  /* Ensure the plus sign is perfectly centered */
+  & span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    margin-top: -2px; /* Small adjustment to visually center the plus sign */
   }
 `;
 
@@ -358,7 +370,9 @@ const Canvas: React.FC = () => {
             <DesignImageWrapper $dimensions={design.dimensions}>
               <DesignImage src={design.imageUrl} alt={design.name} />
               {selectedDesign === design.id && (
-                <PlusButton onClick={handlePlusClick}>+</PlusButton>
+                <PlusButton onClick={handlePlusClick}>
+                  <span>+</span>
+                </PlusButton>
               )}
             </DesignImageWrapper>
           </DesignItem>
