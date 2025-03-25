@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { DesignIteration, Position, AIAnalysis } from '@/types';
+import { DesignIteration, Position } from '@/types';
 import { usePageContext } from './PageContext';
 
 // Generate a random ID (since uuid is not available)
@@ -12,7 +12,6 @@ interface DesignContextType {
   addDesign: (design: Omit<DesignIteration, 'id' | 'timestamp'>) => void;
   removeDesign: (id: string) => void;
   updateDesignPosition: (id: string, position: Position) => void;
-  updateDesignAIAnalysis: (id: string, aiAnalysis: AIAnalysis) => void;
   getDesignsForCurrentPage: () => DesignIteration[];
   getDesignById: (id: string) => DesignIteration | undefined;
 }
@@ -59,16 +58,6 @@ export function DesignProvider({ children }: DesignProviderProps) {
     );
   };
   
-  const updateDesignAIAnalysis = (id: string, aiAnalysis: AIAnalysis) => {
-    setDesigns(prev => 
-      prev.map(design => 
-        design.id === id 
-          ? { ...design, aiAnalysis } 
-          : design
-      )
-    );
-  };
-  
   const getDesignsForCurrentPage = () => {
     return designs.filter(design => design.pageId === currentPage.id);
   };
@@ -82,7 +71,6 @@ export function DesignProvider({ children }: DesignProviderProps) {
     addDesign,
     removeDesign,
     updateDesignPosition,
-    updateDesignAIAnalysis,
     getDesignsForCurrentPage,
     getDesignById
   };
