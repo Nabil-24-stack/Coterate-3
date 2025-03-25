@@ -67,26 +67,30 @@ const DesignImage = styled.img`
   pointer-events: none;
 `;
 
-const PlusButtonContainer = styled.div`
+const PlusButtonContainer = styled.div<{ $dimensions?: { width: number; height: number } }>`
   position: absolute;
-  right: -48px;
+  right: ${props => props.$dimensions ? `-${props.$dimensions.width / 2 + 20}px` : '-48px'};
   top: 50%;
   transform: translateY(-50%);
-  z-index: 20;
+  z-index: 99;
 `;
 
-const PlusButton = styled.div<{ $scale: number }>`
-  width: ${props => 40 / props.$scale}px;
-  height: ${props => 40 / props.$scale}px;
+// Create a fixed-size container that will handle the scaling
+const PlusButtonWrapper = styled.div<{ $scale: number }>`
+  transform: scale(${props => 1 / props.$scale});
+  transform-origin: center center;
+`;
+
+// The plus button itself with fixed size
+const PlusButton = styled.div`
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background-color: #007bff;
   color: white;
   cursor: pointer;
-  box-shadow: 0 ${props => 2 / props.$scale}px ${props => 4 / props.$scale}px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   position: relative;
   
   &:hover {
@@ -101,16 +105,16 @@ const PlusButton = styled.div<{ $scale: number }>`
   }
   
   &::before {
-    width: ${props => 16 / props.$scale}px;
-    height: ${props => 2 / props.$scale}px;
+    width: 16px;
+    height: 2px;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
   }
   
   &::after {
-    width: ${props => 2 / props.$scale}px;
-    height: ${props => 16 / props.$scale}px;
+    width: 2px;
+    height: 16px;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -380,8 +384,10 @@ const Canvas: React.FC = () => {
             <DesignImageWrapper $dimensions={design.dimensions}>
               <DesignImage src={design.imageUrl} alt={design.name} />
               {selectedDesign === design.id && (
-                <PlusButtonContainer>
-                  <PlusButton $scale={scale} onClick={handlePlusClick} />
+                <PlusButtonContainer $dimensions={design.dimensions}>
+                  <PlusButtonWrapper $scale={scale}>
+                    <PlusButton onClick={handlePlusClick} />
+                  </PlusButtonWrapper>
                 </PlusButtonContainer>
               )}
             </DesignImageWrapper>
