@@ -9,25 +9,38 @@ export interface Dimension {
 }
 
 export interface Feedback {
-  comment: string;
-  reviewer: string;
+  text: string;
+  author: string;
+  timestamp: string;
+}
+
+export interface AIAnalysisElement {
+  title: string;
+  description: string;
+  score?: number;
+  confidence?: number;
+}
+
+export interface AIAnalysis {
+  elements: AIAnalysisElement[];
+  overallScore?: number;
   timestamp: string;
 }
 
 export interface DesignIteration {
   id: string;
   name: string;
-  pageId: string;
   imageUrl: string;
+  pageId: string;
   position: Position;
   dimensions?: Dimension;
   feedback: Feedback | null;
+  analysis?: AIAnalysis;
   timestamp: string;
 }
 
 export interface Page {
   id: string;
   name: string;
-  createdAt: string;
-  updatedAt: string;
+  number: number;
 }
