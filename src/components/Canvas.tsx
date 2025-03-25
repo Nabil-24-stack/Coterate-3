@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { usePageContext } from '@/contexts/PageContext';
 import { useDesignContext } from '@/contexts/DesignContext';
-import { Position } from '@/types';
+import { Position, DesignIteration } from '@/types';
 
 const CanvasContainer = styled.div`
   flex: 1;
@@ -36,7 +36,7 @@ const CanvasContent = styled.div<{ $scale: number; $position: Position }>`
   z-index: 1;
 `;
 
-const DesignItem = styled.div<{ $position: Position; $isSelected: boolean }>`
+const DesignItem = styled.div<{ $position: Position; $isSelected: boolean; $isDragging?: boolean }>`
   position: absolute;
   left: ${props => props.$position.x}px;
   top: ${props => props.$position.y}px;
@@ -44,8 +44,8 @@ const DesignItem = styled.div<{ $position: Position; $isSelected: boolean }>`
   border: ${props => props.$isSelected ? '3px solid #007bff' : '2px solid transparent'};
   box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : 'none'};
   transform: translate(-50%, -50%);
-  cursor: pointer;
-  z-index: 10;
+  z-index: ${props => (props.$isSelected || props.$isDragging) ? 20 : 10};
+  cursor: ${props => (props.$isSelected) ? 'move' : 'pointer'};
   
   &:hover {
     box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : '0 0 0 1px rgba(0, 0, 0, 0.1)'};
@@ -68,23 +68,31 @@ const DesignImage = styled.img`
   pointer-events: none;
 `;
 
-const PlusButton = styled.div<{ $scale: number }>`
+const PlusButtonContainer = styled.div<{ $dimensions?: { width: number; height: number } }>`
   position: absolute;
-  right: -20px;
+  right: ${props => props.$dimensions ? `-${5}px` : '-5px'};
   top: 50%;
   transform: translateY(-50%);
-  width: ${props => 40 / props.$scale}px;
-  height: ${props => 40 / props.$scale}px;
+  z-index: 99;
+`;
+
+// Create a fixed-size container that will handle the scaling
+const PlusButtonWrapper = styled.div<{ $scale: number }>`
+  transform: scale(${props => 1 / props.$scale});
+  transform-origin: left center;
+`;
+
+// The plus button itself with fixed size
+const PlusButton = styled.div`
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   background-color: #007bff;
   color: white;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 99;
+  position: relative;
   
   &:hover {
     background-color: #0056b3;
@@ -98,25 +106,36 @@ const PlusButton = styled.div<{ $scale: number }>`
   }
   
   &::before {
-    width: ${props => 16 / props.$scale}px;
-    height: ${props => 2 / props.$scale}px;
+    width: 16px;
+    height: 2px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
   
   &::after {
-    width: ${props => 2 / props.$scale}px;
-    height: ${props => 16 / props.$scale}px;
+    width: 2px;
+    height: 16px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
   }
 `;
 
 const Canvas: React.FC = () => {
   const { currentPage } = usePageContext();
-  const { designs, addDesign, removeDesign, getDesignsForCurrentPage } = useDesignContext();
+  const { designs, addDesign, removeDesign, updateDesignPosition, getDesignsForCurrentPage } = useDesignContext();
   
   const [scale, setScale] = useState<number>(1);
   const [canvasPosition, setCanvasPosition] = useState<Position>({ x: 0, y: 0 });
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
+  
+  // States for design dragging
+  const [isDraggingDesign, setIsDraggingDesign] = useState<boolean>(false);
+  const [designDragStart, setDesignDragStart] = useState<Position>({ x: 0, y: 0 });
+  const [designInitialPosition, setDesignInitialPosition] = useState<Position | null>(null);
   
   const canvasRef = useRef<HTMLDivElement>(null);
   
@@ -189,6 +208,7 @@ const Canvas: React.FC = () => {
   };
   
   const handleMouseMove = (e: React.MouseEvent) => {
+    // Handle canvas dragging
     if (isDragging) {
       const deltaX = e.clientX - dragStart.x;
       const deltaY = e.clientY - dragStart.y;
@@ -200,15 +220,60 @@ const Canvas: React.FC = () => {
       
       setDragStart({ x: e.clientX, y: e.clientY });
     }
+    
+    // Handle design dragging
+    if (isDraggingDesign && selectedDesign && designInitialPosition) {
+      e.stopPropagation();
+      
+      // Calculate the delta in screen coordinates
+      const deltaX = e.clientX - designDragStart.x;
+      const deltaY = e.clientY - designDragStart.y;
+      
+      // Convert the delta to canvas coordinates
+      const deltaCanvasX = deltaX / scale;
+      const deltaCanvasY = deltaY / scale;
+      
+      // Calculate new position
+      const newPosition = {
+        x: designInitialPosition.x + deltaCanvasX,
+        y: designInitialPosition.y + deltaCanvasY
+      };
+      
+      // Update the design position
+      updateDesignPosition(selectedDesign, newPosition);
+    }
   };
   
   const handleMouseUp = () => {
     setIsDragging(false);
+    
+    // End design dragging if it was in progress
+    if (isDraggingDesign) {
+      setIsDraggingDesign(false);
+      setDesignInitialPosition(null);
+    }
   };
   
   const handleDesignClick = (designId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedDesign(designId);
+  };
+  
+  const handleDesignMouseDown = (design: DesignIteration, e: React.MouseEvent) => {
+    if (selectedDesign === design.id) {
+      e.stopPropagation();
+      
+      // Start dragging the design
+      setIsDraggingDesign(true);
+      setDesignDragStart({ x: e.clientX, y: e.clientY });
+      setDesignInitialPosition({ ...design.position });
+    }
+  };
+  
+  const handlePlusClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // This will be implemented later - for now just prevent the click from deselecting
+    console.log('Plus button clicked');
   };
   
   const handlePaste = (e: ClipboardEvent) => {
@@ -235,7 +300,7 @@ const Canvas: React.FC = () => {
             console.log('Pasting image at position:', viewportCenter);
             console.log('Image dimensions:', dimensions.width, 'x', dimensions.height);
             
-            const mockDesign = {
+            const mockDesign: Omit<DesignIteration, 'id' | 'timestamp'> = {
               name: 'Pasted Design',
               pageId: currentPage.id,
               imageUrl: url,
@@ -338,6 +403,10 @@ const Canvas: React.FC = () => {
   // Add an additional handler for mouse leave to prevent stuck drags
   const handleMouseLeave = () => {
     setIsDragging(false);
+    if (isDraggingDesign) {
+      setIsDraggingDesign(false);
+      setDesignInitialPosition(null);
+    }
   };
   
   return (
@@ -356,12 +425,18 @@ const Canvas: React.FC = () => {
             key={design.id}
             $position={design.position}
             $isSelected={selectedDesign === design.id}
+            $isDragging={isDraggingDesign && selectedDesign === design.id}
             onClick={(e) => handleDesignClick(design.id, e)}
+            onMouseDown={(e) => handleDesignMouseDown(design, e)}
           >
             <DesignImageWrapper $dimensions={design.dimensions}>
               <DesignImage src={design.imageUrl} alt={design.name} />
               {selectedDesign === design.id && (
-                <PlusButton $scale={scale} />
+                <PlusButtonContainer $dimensions={design.dimensions}>
+                  <PlusButtonWrapper $scale={scale}>
+                    <PlusButton onClick={handlePlusClick} />
+                  </PlusButtonWrapper>
+                </PlusButtonContainer>
               )}
             </DesignImageWrapper>
           </DesignItem>
