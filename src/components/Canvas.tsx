@@ -3,6 +3,8 @@ import styled from 'styled-components';
 import { usePageContext } from '@/contexts/PageContext';
 import { useDesignContext } from '@/contexts/DesignContext';
 import { Position, DesignIteration } from '@/types';
+import AIAnalysisPanel from './AIAnalysisPanel';
+import { imageUrlToBase64, analyzeUIDesign } from '@/services/analyzeService';
 
 const CanvasContainer = styled.div`
   flex: 1;
@@ -124,7 +126,7 @@ const PlusButton = styled.div`
 
 const Canvas: React.FC = () => {
   const { currentPage } = usePageContext();
-  const { designs, addDesign, removeDesign, updateDesignPosition, getDesignsForCurrentPage } = useDesignContext();
+  const { designs, addDesign, removeDesign, updateDesignPosition, updateDesignAIAnalysis, getDesignsForCurrentPage, getDesignById } = useDesignContext();
   
   const [scale, setScale] = useState<number>(1);
   const [canvasPosition, setCanvasPosition] = useState<Position>({ x: 0, y: 0 });
@@ -136,6 +138,10 @@ const Canvas: React.FC = () => {
   const [isDraggingDesign, setIsDraggingDesign] = useState<boolean>(false);
   const [designDragStart, setDesignDragStart] = useState<Position>({ x: 0, y: 0 });
   const [designInitialPosition, setDesignInitialPosition] = useState<Position | null>(null);
+  
+  // States for AI analysis
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [showAnalysisPanel, setShowAnalysisPanel] = useState<boolean>(false);
   
   const canvasRef = useRef<HTMLDivElement>(null);
   
@@ -154,6 +160,30 @@ const Canvas: React.FC = () => {
     const canvasCenterY = (centerY - canvasPosition.y) / scale;
     
     return { x: canvasCenterX, y: canvasCenterY };
+  };
+  
+  const analyzeDesign = async (designId: string) => {
+    const design = getDesignById(designId);
+    if (!design) return;
+    
+    try {
+      setIsAnalyzing(true);
+      setShowAnalysisPanel(true);
+      
+      // Convert image to base64
+      const imageBase64 = await imageUrlToBase64(design.imageUrl);
+      
+      // Send to OpenAI API
+      const analysis = await analyzeUIDesign(imageBase64);
+      
+      // Update the design with analysis results
+      updateDesignAIAnalysis(designId, analysis);
+    } catch (error) {
+      console.error('Error analyzing design:', error);
+      alert('Failed to analyze design. Please try again.');
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
   
   const handleWheel = (e: React.WheelEvent) => {
@@ -204,6 +234,7 @@ const Canvas: React.FC = () => {
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
       setSelectedDesign(null); // Deselect when clicking on canvas
+      setShowAnalysisPanel(false); // Hide analysis panel when clicking on canvas
     }
   };
   
@@ -270,10 +301,13 @@ const Canvas: React.FC = () => {
     }
   };
   
-  const handlePlusClick = (e: React.MouseEvent) => {
+  const handlePlusClick = (designId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // This will be implemented later - for now just prevent the click from deselecting
-    console.log('Plus button clicked');
+    analyzeDesign(designId);
+  };
+  
+  const handleCloseAnalysisPanel = () => {
+    setShowAnalysisPanel(false);
   };
   
   const handlePaste = (e: ClipboardEvent) => {
@@ -386,6 +420,7 @@ const Canvas: React.FC = () => {
         // Delete selected design when Delete or Backspace key is pressed
         removeDesign(selectedDesign);
         setSelectedDesign(null);
+        setShowAnalysisPanel(false);
       }
     };
     
@@ -399,6 +434,7 @@ const Canvas: React.FC = () => {
   }, [addDesign, removeDesign, currentPage.id, scale, canvasPosition, selectedDesign]);
   
   const currentDesigns = getDesignsForCurrentPage();
+  const selectedDesignData = selectedDesign ? getDesignById(selectedDesign) : null;
   
   // Add an additional handler for mouse leave to prevent stuck drags
   const handleMouseLeave = () => {
@@ -434,7 +470,7 @@ const Canvas: React.FC = () => {
               {selectedDesign === design.id && (
                 <PlusButtonContainer $dimensions={design.dimensions}>
                   <PlusButtonWrapper $scale={scale}>
-                    <PlusButton onClick={handlePlusClick} />
+                    <PlusButton onClick={(e) => handlePlusClick(design.id, e)} />
                   </PlusButtonWrapper>
                 </PlusButtonContainer>
               )}
@@ -442,6 +478,14 @@ const Canvas: React.FC = () => {
           </DesignItem>
         ))}
       </CanvasContent>
+      
+      {showAnalysisPanel && selectedDesignData && (
+        <AIAnalysisPanel
+          analysis={selectedDesignData.aiAnalysis || null}
+          isLoading={isAnalyzing}
+          onClose={handleCloseAnalysisPanel}
+        />
+      )}
     </CanvasContainer>
   );
 };
