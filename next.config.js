@@ -2,10 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  // Disable App Router to prevent conflicts
-  experimental: {
-    appDir: false
-  },
+  // Remove experimental.appDir as it's now deprecated in Next.js 14+
   images: {
     domains: ['plus.unsplash.com', 'images.unsplash.com'],
   },
