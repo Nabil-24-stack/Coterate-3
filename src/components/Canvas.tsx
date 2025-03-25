@@ -2,9 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { usePageContext } from '@/contexts/PageContext';
 import { useDesignContext } from '@/contexts/DesignContext';
-import { Position, DesignIteration } from '@/types';
-import AIAnalysisPanel from './AIAnalysisPanel';
-import { imageUrlToBase64, analyzeUIDesign } from '@/services/analyzeService';
+import { Position } from '@/types';
 
 const CanvasContainer = styled.div`
   flex: 1;
@@ -38,7 +36,7 @@ const CanvasContent = styled.div<{ $scale: number; $position: Position }>`
   z-index: 1;
 `;
 
-const DesignItem = styled.div<{ $position: Position; $isSelected: boolean; $isDragging?: boolean }>`
+const DesignItem = styled.div<{ $position: Position; $isSelected: boolean }>`
   position: absolute;
   left: ${props => props.$position.x}px;
   top: ${props => props.$position.y}px;
@@ -46,8 +44,8 @@ const DesignItem = styled.div<{ $position: Position; $isSelected: boolean; $isDr
   border: ${props => props.$isSelected ? '3px solid #007bff' : '2px solid transparent'};
   box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : 'none'};
   transform: translate(-50%, -50%);
-  z-index: ${props => (props.$isSelected || props.$isDragging) ? 20 : 10};
-  cursor: ${props => (props.$isSelected) ? 'move' : 'pointer'};
+  cursor: pointer;
+  z-index: 10;
   
   &:hover {
     box-shadow: ${props => props.$isSelected ? '0 0 8px rgba(0, 123, 255, 0.5)' : '0 0 0 1px rgba(0, 0, 0, 0.1)'};
@@ -70,31 +68,23 @@ const DesignImage = styled.img`
   pointer-events: none;
 `;
 
-const PlusButtonContainer = styled.div<{ $dimensions?: { width: number; height: number } }>`
+const PlusButton = styled.div<{ $scale: number }>`
   position: absolute;
-  right: ${props => props.$dimensions ? `-${5}px` : '-5px'};
+  right: -20px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 99;
-`;
-
-// Create a fixed-size container that will handle the scaling
-const PlusButtonWrapper = styled.div<{ $scale: number }>`
-  transform: scale(${props => 1 / props.$scale});
-  transform-origin: left center;
-`;
-
-// The plus button itself with fixed size
-const PlusButton = styled.div`
-  width: 40px;
-  height: 40px;
+  width: ${props => 40 / props.$scale}px;
+  height: ${props => 40 / props.$scale}px;
   border-radius: 50%;
   background-color: #007bff;
   color: white;
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: background-color 0.2s ease;
-  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99;
   
   &:hover {
     background-color: #0056b3;
@@ -108,40 +98,25 @@ const PlusButton = styled.div`
   }
   
   &::before {
-    width: 16px;
-    height: 2px;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    width: ${props => 16 / props.$scale}px;
+    height: ${props => 2 / props.$scale}px;
   }
   
   &::after {
-    width: 2px;
-    height: 16px;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    width: ${props => 2 / props.$scale}px;
+    height: ${props => 16 / props.$scale}px;
   }
 `;
 
 const Canvas: React.FC = () => {
   const { currentPage } = usePageContext();
-  const { designs, addDesign, removeDesign, updateDesignPosition, updateDesignAIAnalysis, getDesignsForCurrentPage, getDesignById } = useDesignContext();
+  const { designs, addDesign, removeDesign, getDesignsForCurrentPage } = useDesignContext();
   
   const [scale, setScale] = useState<number>(1);
   const [canvasPosition, setCanvasPosition] = useState<Position>({ x: 0, y: 0 });
   const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const [dragStart, setDragStart] = useState<Position>({ x: 0, y: 0 });
-  
-  // States for design dragging
-  const [isDraggingDesign, setIsDraggingDesign] = useState<boolean>(false);
-  const [designDragStart, setDesignDragStart] = useState<Position>({ x: 0, y: 0 });
-  const [designInitialPosition, setDesignInitialPosition] = useState<Position | null>(null);
-  
-  // States for AI analysis
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [showAnalysisPanel, setShowAnalysisPanel] = useState<boolean>(false);
   
   const canvasRef = useRef<HTMLDivElement>(null);
   
@@ -160,30 +135,6 @@ const Canvas: React.FC = () => {
     const canvasCenterY = (centerY - canvasPosition.y) / scale;
     
     return { x: canvasCenterX, y: canvasCenterY };
-  };
-  
-  const analyzeDesign = async (designId: string) => {
-    const design = getDesignById(designId);
-    if (!design) return;
-    
-    try {
-      setIsAnalyzing(true);
-      setShowAnalysisPanel(true);
-      
-      // Convert image to base64
-      const imageBase64 = await imageUrlToBase64(design.imageUrl);
-      
-      // Send to OpenAI API
-      const analysis = await analyzeUIDesign(imageBase64);
-      
-      // Update the design with analysis results
-      updateDesignAIAnalysis(designId, analysis);
-    } catch (error) {
-      console.error('Error analyzing design:', error);
-      alert('Failed to analyze design. Please try again.');
-    } finally {
-      setIsAnalyzing(false);
-    }
   };
   
   const handleWheel = (e: React.WheelEvent) => {
@@ -234,12 +185,10 @@ const Canvas: React.FC = () => {
       setIsDragging(true);
       setDragStart({ x: e.clientX, y: e.clientY });
       setSelectedDesign(null); // Deselect when clicking on canvas
-      setShowAnalysisPanel(false); // Hide analysis panel when clicking on canvas
     }
   };
   
   const handleMouseMove = (e: React.MouseEvent) => {
-    // Handle canvas dragging
     if (isDragging) {
       const deltaX = e.clientX - dragStart.x;
       const deltaY = e.clientY - dragStart.y;
@@ -251,63 +200,15 @@ const Canvas: React.FC = () => {
       
       setDragStart({ x: e.clientX, y: e.clientY });
     }
-    
-    // Handle design dragging
-    if (isDraggingDesign && selectedDesign && designInitialPosition) {
-      e.stopPropagation();
-      
-      // Calculate the delta in screen coordinates
-      const deltaX = e.clientX - designDragStart.x;
-      const deltaY = e.clientY - designDragStart.y;
-      
-      // Convert the delta to canvas coordinates
-      const deltaCanvasX = deltaX / scale;
-      const deltaCanvasY = deltaY / scale;
-      
-      // Calculate new position
-      const newPosition = {
-        x: designInitialPosition.x + deltaCanvasX,
-        y: designInitialPosition.y + deltaCanvasY
-      };
-      
-      // Update the design position
-      updateDesignPosition(selectedDesign, newPosition);
-    }
   };
   
   const handleMouseUp = () => {
     setIsDragging(false);
-    
-    // End design dragging if it was in progress
-    if (isDraggingDesign) {
-      setIsDraggingDesign(false);
-      setDesignInitialPosition(null);
-    }
   };
   
   const handleDesignClick = (designId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     setSelectedDesign(designId);
-  };
-  
-  const handleDesignMouseDown = (design: DesignIteration, e: React.MouseEvent) => {
-    if (selectedDesign === design.id) {
-      e.stopPropagation();
-      
-      // Start dragging the design
-      setIsDraggingDesign(true);
-      setDesignDragStart({ x: e.clientX, y: e.clientY });
-      setDesignInitialPosition({ ...design.position });
-    }
-  };
-  
-  const handlePlusClick = (designId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    analyzeDesign(designId);
-  };
-  
-  const handleCloseAnalysisPanel = () => {
-    setShowAnalysisPanel(false);
   };
   
   const handlePaste = (e: ClipboardEvent) => {
@@ -334,7 +235,7 @@ const Canvas: React.FC = () => {
             console.log('Pasting image at position:', viewportCenter);
             console.log('Image dimensions:', dimensions.width, 'x', dimensions.height);
             
-            const mockDesign: Omit<DesignIteration, 'id' | 'timestamp'> = {
+            const mockDesign = {
               name: 'Pasted Design',
               pageId: currentPage.id,
               imageUrl: url,
@@ -420,7 +321,6 @@ const Canvas: React.FC = () => {
         // Delete selected design when Delete or Backspace key is pressed
         removeDesign(selectedDesign);
         setSelectedDesign(null);
-        setShowAnalysisPanel(false);
       }
     };
     
@@ -434,15 +334,10 @@ const Canvas: React.FC = () => {
   }, [addDesign, removeDesign, currentPage.id, scale, canvasPosition, selectedDesign]);
   
   const currentDesigns = getDesignsForCurrentPage();
-  const selectedDesignData = selectedDesign ? getDesignById(selectedDesign) : null;
   
   // Add an additional handler for mouse leave to prevent stuck drags
   const handleMouseLeave = () => {
     setIsDragging(false);
-    if (isDraggingDesign) {
-      setIsDraggingDesign(false);
-      setDesignInitialPosition(null);
-    }
   };
   
   return (
@@ -461,31 +356,17 @@ const Canvas: React.FC = () => {
             key={design.id}
             $position={design.position}
             $isSelected={selectedDesign === design.id}
-            $isDragging={isDraggingDesign && selectedDesign === design.id}
             onClick={(e) => handleDesignClick(design.id, e)}
-            onMouseDown={(e) => handleDesignMouseDown(design, e)}
           >
             <DesignImageWrapper $dimensions={design.dimensions}>
               <DesignImage src={design.imageUrl} alt={design.name} />
               {selectedDesign === design.id && (
-                <PlusButtonContainer $dimensions={design.dimensions}>
-                  <PlusButtonWrapper $scale={scale}>
-                    <PlusButton onClick={(e) => handlePlusClick(design.id, e)} />
-                  </PlusButtonWrapper>
-                </PlusButtonContainer>
+                <PlusButton $scale={scale} />
               )}
             </DesignImageWrapper>
           </DesignItem>
         ))}
       </CanvasContent>
-      
-      {showAnalysisPanel && selectedDesignData && (
-        <AIAnalysisPanel
-          analysis={selectedDesignData.aiAnalysis || null}
-          isLoading={isAnalyzing}
-          onClose={handleCloseAnalysisPanel}
-        />
-      )}
     </CanvasContainer>
   );
 };
