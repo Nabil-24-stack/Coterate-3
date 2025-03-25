@@ -14,6 +14,20 @@ export interface Feedback {
   timestamp: string;
 }
 
+export interface AIAnalysisElement {
+  type: string;
+  text?: string;
+  position: Position;
+  dimensions: Dimension;
+  properties: Record<string, any>;
+}
+
+export interface AIAnalysis {
+  description: string;
+  elements: AIAnalysisElement[];
+  recommendations?: string[];
+}
+
 export interface DesignIteration {
   id: string;
   name: string;
@@ -23,6 +37,7 @@ export interface DesignIteration {
   dimensions?: Dimension;
   feedback: Feedback | null;
   timestamp: string;
+  aiAnalysis?: AIAnalysis;
 }
 
 export interface Page {
