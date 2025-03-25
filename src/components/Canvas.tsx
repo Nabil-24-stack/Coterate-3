@@ -69,7 +69,7 @@ const DesignImage = styled.img`
 
 const PlusButtonContainer = styled.div<{ $dimensions?: { width: number; height: number } }>`
   position: absolute;
-  right: ${props => props.$dimensions ? `-${props.$dimensions.width / 2 + 5}px` : '-20px'};
+  right: ${props => props.$dimensions ? `-${props.$dimensions.width / 2 - 15}px` : '-10px'};
   top: 50%;
   transform: translateY(-50%);
   z-index: 99;
