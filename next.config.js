@@ -4,7 +4,9 @@ const nextConfig = {
   compiler: {
     styledComponents: true,
   },
-  devIndicators: false,
+  devIndicators: {
+    buildActivity: false
+  },
   images: {
     dangerouslyAllowSVG: true,
     remotePatterns: [
