@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "src/pages/api/analyze-ui.ts": {
+      "maxDuration": 60
+    }
+  }
+} 

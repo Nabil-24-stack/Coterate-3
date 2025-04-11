@@ -225,6 +225,51 @@ const Sidebar: React.FC = () => {
   
   const currentDesigns = getDesignsForCurrentPage();
   
+  // Client-side image compression utility
+  const compressImageClientSide = (imageUrl: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxDimension = 800;
+        let width = img.width;
+        let height = img.height;
+        
+        if (width > maxDimension || height > maxDimension) {
+          if (width > height) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          } else {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          return reject(new Error('Could not get canvas context'));
+        }
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // Get compressed base64 (JPEG, quality 0.8)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+        resolve(compressedBase64);
+      };
+      
+      img.onerror = (err) => {
+        console.error('Error loading image for compression:', err);
+        reject(new Error('Failed to load image for compression'));
+      };
+      
+      img.src = imageUrl;
+    });
+  };
+
   const handleAddPage = () => {
     // Add a new page with default title
     addPage("Untitled");
@@ -280,57 +325,44 @@ const Sidebar: React.FC = () => {
     setShowAnalysisPanel(true);
     
     try {
-      // Convert image URL to base64 for sending to API
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
+      // Compress image client-side first
+      const compressedBase64DataUrl = await compressImageClientSide(design.imageUrl);
+      const base64Image = compressedBase64DataUrl.split(',')[1]; // Extract base64 part
       
-      img.onload = async () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
+      console.log('Compressed image size (approx):', Math.round(base64Image.length * 0.75 / 1024), 'KB');
+      
+      // Call the API with the compressed image
+      const response = await fetch('/api/analyze-ui', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          imageBase64: base64Image // Send only the base64 string
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAnalysisResult(data);
         
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          setIsAnalyzing(false);
-          return;
+        // Save the analysis to the design
+        updateDesignAIAnalysis(selectedDesign, data);
+      } else {
+        const errorText = await response.text();
+        console.error('Failed to analyze design:', response.status, errorText);
+        try {
+          const errorDetails = JSON.parse(errorText);
+          alert(`Failed to analyze design: ${errorDetails.error} (Status: ${response.status})`);
+        } catch (parseError) {
+          alert(`Failed to analyze design. Status: ${response.status}`);
         }
-        
-        ctx.drawImage(img, 0, 0);
-        const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
-        
-        // Call the API to analyze the image
-        const response = await fetch('/api/analyze-ui', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            imageBase64: base64Image
-          })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          setAnalysisResult(data);
-          
-          // Save the analysis to the design
-          updateDesignAIAnalysis(selectedDesign, data);
-        } else {
-          console.error('Failed to analyze design:', await response.text());
-          alert('Failed to analyze design. Please try again.');
-        }
-        
-        setIsAnalyzing(false);
-      };
+      }
       
-      img.onerror = () => {
-        setIsAnalyzing(false);
-        alert('Failed to load image for analysis.');
-      };
-      
-      img.src = design.imageUrl;
-    } catch (error) {
-      console.error('Error analyzing design:', error);
+      setIsAnalyzing(false);
+    } catch (error: any) {
+      console.error('Error during analysis process:', error);
+      alert(`An error occurred: ${error.message}`);
       setIsAnalyzing(false);
     }
   };
