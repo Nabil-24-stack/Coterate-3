@@ -69,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'claude-3-7-sonnet-20240620',
+        model: 'claude-3-7-sonnet-20250219',
         messages: [
           {
             role: 'user',
