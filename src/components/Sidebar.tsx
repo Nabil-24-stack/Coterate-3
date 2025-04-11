@@ -1,9 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import styled from 'styled-components';
 import { usePageContext } from '@/contexts/PageContext';
+import { useDesignContext } from '@/contexts/DesignContext';
+import AIAnalysisPanel from './AIAnalysisPanel';
+import { AIAnalysis } from '@/types';
 
 const SidebarContainer = styled.div`
-  width: 240px;
+  width: 280px;
   height: 100%;
   background-color: #F8F8F8;
   border-right: 1px solid #e0e0e0;
@@ -29,7 +32,20 @@ const NewButton = styled.button`
   }
 `;
 
+const SectionTitle = styled.div`
+  padding: 12px 16px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+`;
+
 const PageList = styled.div`
+  overflow-y: auto;
+`;
+
+const DesignsList = styled.div`
   flex: 1;
   overflow-y: auto;
 `;
@@ -48,6 +64,39 @@ const PageItem = styled.div<{ $isActive: boolean }>`
   }
 `;
 
+const DesignItem = styled.div<{ $isSelected: boolean }>`
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  cursor: pointer;
+  background-color: ${props => props.$isSelected ? '#EFEFEF' : 'transparent'};
+  position: relative;
+  border-bottom: 1px solid #f0f0f0;
+  
+  &:hover {
+    background-color: #f5f5f5;
+  }
+`;
+
+const DesignThumbnail = styled.div`
+  height: 100px;
+  background-color: #eee;
+  border-radius: 4px;
+  overflow: hidden;
+`;
+
+const DesignImage = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+`;
+
+const DesignName = styled.div`
+  font-size: 13px;
+  font-weight: 500;
+`;
+
 const PageName = styled.div`
   font-size: 14px;
   font-weight: 500;
@@ -55,8 +104,34 @@ const PageName = styled.div`
 
 const ActionButton = styled.button`
   opacity: 0.5;
+  background: none;
+  border: none;
+  cursor: pointer;
+  
   &:hover {
     opacity: 1;
+  }
+`;
+
+const AnalyzeButton = styled.button`
+  margin-top: 8px;
+  padding: 6px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  
+  &:hover {
+    background-color: #0056b3;
+  }
+  
+  &:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
   }
 `;
 
@@ -128,13 +203,27 @@ const UserPlan = styled.div`
   color: #888;
 `;
 
+const EmptyState = styled.div`
+  padding: 24px 16px;
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+`;
+
 const Sidebar: React.FC = () => {
   const { pages, currentPage, addPage, setCurrentPage, renamePage, deletePage } = usePageContext();
+  const { designs, getDesignsForCurrentPage, updateDesignAIAnalysis } = useDesignContext();
   const [isRenamingPage, setIsRenamingPage] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [selectedDesign, setSelectedDesign] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [analysisResult, setAnalysisResult] = useState<AIAnalysis | null>(null);
+  const [showAnalysisPanel, setShowAnalysisPanel] = useState<boolean>(false);
   
   const outsideClickRef = useRef<HTMLDivElement>(null);
+  
+  const currentDesigns = getDesignsForCurrentPage();
   
   const handleAddPage = () => {
     // Add a new page with default title
@@ -177,6 +266,80 @@ const Sidebar: React.FC = () => {
     setOpenDropdown(null);
   };
   
+  const handleDesignSelect = (designId: string) => {
+    setSelectedDesign(designId === selectedDesign ? null : designId);
+  };
+  
+  const handleAnalyzeDesign = async () => {
+    if (!selectedDesign) return;
+    
+    const design = designs.find(d => d.id === selectedDesign);
+    if (!design) return;
+    
+    setIsAnalyzing(true);
+    setShowAnalysisPanel(true);
+    
+    try {
+      // Convert image URL to base64 for sending to API
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      
+      img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setIsAnalyzing(false);
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0);
+        const base64Image = canvas.toDataURL('image/jpeg').split(',')[1];
+        
+        // Call the API to analyze the image
+        const response = await fetch('/api/analyze-ui', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            imageBase64: base64Image
+          })
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAnalysisResult(data);
+          
+          // Save the analysis to the design
+          updateDesignAIAnalysis(selectedDesign, data);
+        } else {
+          console.error('Failed to analyze design:', await response.text());
+          alert('Failed to analyze design. Please try again.');
+        }
+        
+        setIsAnalyzing(false);
+      };
+      
+      img.onerror = () => {
+        setIsAnalyzing(false);
+        alert('Failed to load image for analysis.');
+      };
+      
+      img.src = design.imageUrl;
+    } catch (error) {
+      console.error('Error analyzing design:', error);
+      setIsAnalyzing(false);
+    }
+  };
+  
+  const closeAnalysisPanel = () => {
+    setShowAnalysisPanel(false);
+    setAnalysisResult(null);
+  };
+  
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -197,6 +360,7 @@ const Sidebar: React.FC = () => {
         New Page
       </NewButton>
       
+      <SectionTitle>Pages</SectionTitle>
       <PageList>
         {pages.map(page => (
           <PageItem 
@@ -238,6 +402,38 @@ const Sidebar: React.FC = () => {
         ))}
       </PageList>
       
+      <SectionTitle>Designs</SectionTitle>
+      <DesignsList>
+        {currentDesigns.length === 0 ? (
+          <EmptyState>
+            No designs on this page.
+            <br />
+            Paste or drag an image to get started.
+          </EmptyState>
+        ) : (
+          currentDesigns.map(design => (
+            <DesignItem 
+              key={design.id}
+              $isSelected={design.id === selectedDesign}
+              onClick={() => handleDesignSelect(design.id)}
+            >
+              <DesignThumbnail>
+                <DesignImage src={design.imageUrl} alt={design.name} />
+              </DesignThumbnail>
+              <DesignName>{design.name}</DesignName>
+              {design.id === selectedDesign && (
+                <AnalyzeButton 
+                  onClick={handleAnalyzeDesign} 
+                  disabled={isAnalyzing}
+                >
+                  {isAnalyzing ? 'Analyzing...' : 'Analyze UI'}
+                </AnalyzeButton>
+              )}
+            </DesignItem>
+          ))
+        )}
+      </DesignsList>
+      
       <UserInfo>
         <Avatar>N</Avatar>
         <UserDetails>
@@ -245,6 +441,14 @@ const Sidebar: React.FC = () => {
           <UserPlan>Free</UserPlan>
         </UserDetails>
       </UserInfo>
+      
+      {showAnalysisPanel && (
+        <AIAnalysisPanel 
+          analysis={analysisResult} 
+          isLoading={isAnalyzing}
+          onClose={closeAnalysisPanel}
+        />
+      )}
     </SidebarContainer>
   );
 };

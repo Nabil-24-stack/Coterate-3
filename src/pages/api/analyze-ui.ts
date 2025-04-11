@@ -1,11 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const API_URL = 'https://api.openai.com/v1/chat/completions';
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+const API_URL = 'https://api.anthropic.com/v1/messages';
 
 const UI_ANALYSIS_PROMPT = `
-You are an expert UI/UX designer and analyst specialized in analyzing UI wireframes and mockups.
-This is a UI wireframe/sketch. Analyze it and identify all UI elements present, including:
+You are an expert UI/UX designer and frontend developer specialized in analyzing UI wireframes and mockups.
+This is a UI wireframe/sketch. First, analyze it and identify all UI elements present, including:
 - Type of each element (button, text field, dropdown, etc.)
 - Approximate position and size
 - Hierarchy and grouping
@@ -15,7 +15,14 @@ This is a UI wireframe/sketch. Analyze it and identify all UI elements present, 
 Use the positions and dimensions from the image, estimating the coordinates and sizes of elements.
 For positions, return values where the top-left corner of the image is (0,0).
 
-Return your analysis as a structured JSON object that follows this format:
+Based on this analysis, generate the following:
+1. A detailed description of the UI
+2. The semantic HTML5 markup that represents this UI
+3. The CSS code needed to style the HTML to match the design
+4. Both the HTML and CSS should be optimized for web standards and performance
+5. Include appropriate accessibility attributes (aria-labels, alt text, etc.)
+
+Return your response as a structured JSON object that follows this format:
 {
   "description": "A brief overview of what you see in the design",
   "elements": [
@@ -27,7 +34,9 @@ Return your analysis as a structured JSON object that follows this format:
       "properties": {}
     },
     ...
-  ]
+  ],
+  "html": "The complete HTML markup for the UI",
+  "css": "The complete CSS code to style the UI"
 }
 `;
 
@@ -37,8 +46,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    if (!OPENAI_API_KEY) {
-      return res.status(500).json({ error: 'OpenAI API key is not configured' });
+    if (!ANTHROPIC_API_KEY) {
+      return res.status(500).json({ error: 'Anthropic API key is not configured' });
     }
 
     const { imageBase64 } = req.body;
@@ -56,42 +65,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01'
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: 'claude-3-7-sonnet-20240620',
         messages: [
-          {
-            role: 'system',
-            content: UI_ANALYSIS_PROMPT
-          },
           {
             role: 'user',
             content: [
-              { type: 'text', text: 'Analyze this UI design:' },
-              { type: 'image_url', image_url: { url: formattedBase64 } }
+              { type: 'text', text: UI_ANALYSIS_PROMPT },
+              { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: imageBase64.replace(/^data:image\/\w+;base64,/, '') } }
             ]
           }
         ],
-        response_format: { type: 'json_object' },
         max_tokens: 4000
       })
     });
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      return res.status(response.status).json({ error: 'Error calling OpenAI API', details: errorData });
+      console.error('Anthropic API error:', errorData);
+      return res.status(response.status).json({ error: 'Error calling Anthropic API', details: errorData });
     }
 
     const data = await response.json();
     
     // Parse the response to extract the content
     try {
-      const analysisContent = JSON.parse(data.choices[0].message.content);
+      const contentText = data.content[0].text;
+      let analysisContent;
+      
+      // Extract JSON object from the response text if needed
+      const jsonMatch = contentText.match(/```json\n([\s\S]*?)\n```/) || 
+                        contentText.match(/```\n([\s\S]*?)\n```/) ||
+                        contentText.match(/{[\s\S]*}/);
+                        
+      if (jsonMatch) {
+        analysisContent = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+      } else {
+        analysisContent = JSON.parse(contentText);
+      }
+      
       return res.status(200).json(analysisContent);
     } catch (error) {
-      console.error('Error parsing OpenAI response:', error);
+      console.error('Error parsing Anthropic response:', error);
       return res.status(500).json({ error: 'Failed to parse analysis results' });
     }
   } catch (error) {

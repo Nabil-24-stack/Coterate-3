@@ -25,6 +25,8 @@ export interface AIAnalysisElement {
 export interface AIAnalysis {
   description: string;
   elements: AIAnalysisElement[];
+  html?: string;
+  css?: string;
 }
 
 export interface DesignIteration {
