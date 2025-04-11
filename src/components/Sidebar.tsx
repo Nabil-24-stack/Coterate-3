@@ -315,14 +315,18 @@ const Sidebar: React.FC = () => {
     setSelectedDesign(designId === selectedDesign ? null : designId);
   };
   
-  const handleAnalyzeDesign = async () => {
+  const handleAnalyzeDesign = async (retryCount = 0) => {
     if (!selectedDesign) return;
     
     const design = designs.find(d => d.id === selectedDesign);
     if (!design) return;
     
-    setIsAnalyzing(true);
-    setShowAnalysisPanel(true);
+    // Only set analyzing state on the first attempt
+    if (retryCount === 0) {
+      setIsAnalyzing(true);
+      setShowAnalysisPanel(true);
+      setAnalysisResult(null); // Clear previous results
+    }
     
     try {
       // Compress image client-side first
@@ -345,21 +349,37 @@ const Sidebar: React.FC = () => {
       if (response.ok) {
         const data = await response.json();
         setAnalysisResult(data);
-        
-        // Save the analysis to the design
         updateDesignAIAnalysis(selectedDesign, data);
+        setIsAnalyzing(false); // Analysis successful
       } else {
-        const errorText = await response.text();
-        console.error('Failed to analyze design:', response.status, errorText);
-        try {
-          const errorDetails = JSON.parse(errorText);
-          alert(`Failed to analyze design: ${errorDetails.error} (Status: ${response.status})`);
-        } catch (parseError) {
-          alert(`Failed to analyze design. Status: ${response.status}`);
+        // Handle specific errors like overload
+        if (response.status === 529) {
+          console.warn('Anthropic API overloaded (529).');
+          const maxRetries = 2;
+          if (retryCount < maxRetries) {
+            const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff (1s, 2s)
+            console.log(`Retrying analysis in ${delay / 1000}s... (Attempt ${retryCount + 1}/${maxRetries})`);
+            setTimeout(() => handleAnalyzeDesign(retryCount + 1), delay);
+            // Keep loading state active while retrying
+            return; 
+          } else {
+            alert('The AI service is currently overloaded. Please try again in a few moments.');
+            setIsAnalyzing(false);
+          }
+        } else {
+          // Handle other errors
+          const errorText = await response.text();
+          console.error('Failed to analyze design:', response.status, errorText);
+          try {
+            const errorDetails = JSON.parse(errorText);
+            alert(`Failed to analyze design: ${errorDetails.error || 'Unknown error'} (Status: ${response.status})`);
+          } catch (parseError) {
+            alert(`Failed to analyze design. Status: ${response.status}`);
+          }
+          setIsAnalyzing(false);
         }
       }
       
-      setIsAnalyzing(false);
     } catch (error: any) {
       console.error('Error during analysis process:', error);
       alert(`An error occurred: ${error.message}`);
@@ -455,7 +475,7 @@ const Sidebar: React.FC = () => {
               <DesignName>{design.name}</DesignName>
               {design.id === selectedDesign && (
                 <AnalyzeButton 
-                  onClick={handleAnalyzeDesign} 
+                  onClick={() => handleAnalyzeDesign()} 
                   disabled={isAnalyzing}
                 >
                   {isAnalyzing ? 'Analyzing...' : 'Analyze UI'}
